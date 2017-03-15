@@ -76,36 +76,58 @@ static void siw_free_chunk(struct siw_page_chunk *chunk, int num_pages)
 
 void siw_umem_release(struct siw_umem *umem)
 {
+	printk("Call in siw_umem_release umem:%p\n", umem);
+	if (umem == NULL)
+	{
+		printk("siw_umem_release get NULL umem");
+		return;
+	}
+	printk("Point 0 in siw_umem_release\n");
 	struct task_struct *task = get_pid_task(umem->pid, PIDTYPE_PID);
 	int i, num_pages = umem->num_pages;
-
+	printk("Point 1 in siw_umem_release\n");
 	for (i = 0; num_pages; i++) {
 		int to_free = min_t(int, PAGES_PER_CHUNK, num_pages);
 		siw_free_chunk(&umem->page_chunk[i], to_free);
 		num_pages -= to_free;
 	}
+	printk("Point 2 in siw_umem_release\n");
 	put_pid(umem->pid);
+	printk("Point 3III in siw_umem_release\n");
 	if (task) {
+		printk("Point 3a in siw_umem_release\n");
 		struct mm_struct *mm_s = get_task_mm(task);
+		printk("Point 3b in siw_umem_release\n");
 		put_task_struct(task);
+		printk("Point 3c in siw_umem_release\n");
 		if (mm_s) {
 			if (down_write_trylock(&mm_s->mmap_sem)) {
+				printk("Point 3d in siw_umem_release\n");
 				mm_s->pinned_vm -= umem->num_pages;
+				printk("Point 3e in siw_umem_release\n");
 				up_write(&mm_s->mmap_sem);
+				printk("Point 3f in siw_umem_release\n");
 				mmput(mm_s);
+				printk("Point 3g in siw_umem_release\n");
 			} else {
 				/*
 				 * Schedule delayed accounting if 
 				 * mm semaphore not available
 				 */
+				printk("Point 3h in siw_umem_release\n");
+
 				INIT_WORK(&umem->work, siw_umem_update_stats);
+				printk("Point 3i in siw_umem_release\n");
 				umem->mm_s = mm_s;
+				printk("Point 3j in siw_umem_release\n");
 				schedule_work(&umem->work);
+				printk("Point 3k in siw_umem_release\n");
 
 				return;
 			}
 		}
 	}
+	printk("Point 4 in siw_umem_release\n");
 	kfree(umem->page_chunk);
 	kfree(umem);
 }
@@ -121,7 +143,10 @@ struct siw_umem *siw_umem_get(u64 start, u64 len)
 		return ERR_PTR(-EPERM);
 
 	if (!len)
+	{
+		printk("get_user_pages len is zero!");
 		return ERR_PTR(-EINVAL);
+	}
 
 	first_page_va = start & PAGE_MASK;
 	num_pages = PAGE_ALIGN(start + len - first_page_va) >> PAGE_SHIFT;
@@ -168,6 +193,7 @@ struct siw_umem *siw_umem_get(u64 start, u64 len)
 				first_page_va, nents, 1, 1, plist,
 				NULL);
 #endif
+			printk("get_user_pages get rv:%d", rv);
 			if (rv < 0 )
 				goto out;
 

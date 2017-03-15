@@ -314,9 +314,7 @@ void siw_remove_obj(spinlock_t *lock, struct idr *idr,
 		      struct siw_objhdr *hdr)
 {
 	unsigned long	flags;
-
 	dprint(DBG_OBJ, "(OBJ%d): IDR Remove Object\n", hdr->id);
-
 	spin_lock_irqsave(lock, flags);
 	idr_remove(idr, hdr->id);
 	spin_unlock_irqrestore(lock, flags);

@@ -129,9 +129,9 @@ out:
 	return key;
 }
 
-static struct siw_uobj *        
+static struct siw_uobj *
 siw_remove_uobj(struct siw_ucontext *uctx, u32 key, u32 size)
-{       
+{
 	struct list_head *pos, *nxt;
 
 	spin_lock(&uctx->uobj_lock);
@@ -149,9 +149,9 @@ siw_remove_uobj(struct siw_ucontext *uctx, u32 key, u32 size)
 	return NULL;
 }
 
-int     
+int
 siw_mmap(struct ib_ucontext *ctx, struct vm_area_struct *vma)
-{       
+{
 	struct siw_ucontext     *uctx = siw_ctx_ofa2siw(ctx);
 	struct siw_uobj         *uobj;
 	u32     key = vma->vm_pgoff << PAGE_SHIFT;
@@ -270,7 +270,7 @@ int siw_query_device(struct ib_device *ofa_dev, struct ib_device_attr *attr)
 	attr->max_qp_rd_atom = sdev->attrs.max_ord;
 	attr->max_qp_init_rd_atom = sdev->attrs.max_ird;
 	attr->max_res_rd_atom = sdev->attrs.max_qp * sdev->attrs.max_ird;
-	attr->device_cap_flags = sdev->attrs.cap_flags;
+	attr->device_cap_flags = sdev->attrs.cap_flags| IB_DEVICE_MEM_MGT_EXTENSIONS;
 	attr->max_sge = sdev->attrs.max_sge;
 	attr->max_sge_rd = sdev->attrs.max_sge_rd;
 	attr->max_cq = sdev->attrs.max_cq;
@@ -447,7 +447,7 @@ int siw_dealloc_pd(struct ib_pd *ofa_pd)
 {
 	struct siw_pd	*pd = siw_pd_ofa2siw(ofa_pd);
 	struct siw_dev	*sdev = siw_dev_ofa2siw(ofa_pd->device);
-
+	printk("To call siw_remove_obj, pd:%p", pd);
 	siw_remove_obj(&sdev->idr_lock, &sdev->pd_idr, &pd->hdr);
 	siw_pd_put(pd);
 
@@ -589,7 +589,7 @@ struct ib_qp *siw_create_qp(struct ib_pd *ofa_pd,
 
 	num_sqe = roundup_pow_of_two(attrs->cap.max_send_wr);
 	num_rqe = roundup_pow_of_two(attrs->cap.max_recv_wr);
-	
+
 	if (qp->kernel_verbs)
 		qp->sendq = vmalloc(num_sqe * sizeof(struct siw_sqe));
 	else
@@ -1127,11 +1127,11 @@ int siw_post_send(struct ib_qp *ofa_qp, struct ib_send_wr *wr,
 			 * NOTE: zero length RREAD is allowed!
 			 */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0)
-			sqe->raddr	= rdma_wr(wr)->remote_addr;	 
+			sqe->raddr	= rdma_wr(wr)->remote_addr;
 			sqe->raddr	= rdma_wr(wr)->remote_addr;
 			sqe->rkey	= rdma_wr(wr)->rkey;
 #else
-			sqe->raddr	= wr->wr.rdma.remote_addr;	 
+			sqe->raddr	= wr->wr.rdma.remote_addr;
 			sqe->raddr	= wr->wr.rdma.remote_addr;
 			sqe->rkey	= wr->wr.rdma.rkey;
 #endif
@@ -1154,7 +1154,7 @@ int siw_post_send(struct ib_qp *ofa_qp, struct ib_send_wr *wr,
 				sqe->flags |= SIW_WQE_INLINE;
 				sqe->num_sge = 1;
 			}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0)			
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0)
 			sqe->raddr	= rdma_wr(wr)->remote_addr;
 			sqe->rkey	= rdma_wr(wr)->rkey;
 #else
@@ -1183,7 +1183,7 @@ int siw_post_send(struct ib_qp *ofa_qp, struct ib_send_wr *wr,
 		qp->sq_put++;
 		wr = wr->next;
 	}
-	
+
 	/*
 	 * Send directly if SQ processing is not in progress.
 	 * Eventual immediate errors (rv < 0) do not affect the involved
@@ -1211,7 +1211,7 @@ int siw_post_send(struct ib_qp *ofa_qp, struct ib_send_wr *wr,
 
 		qp->tx_ctx.in_syscall = 0;
 	}
-	
+
 skip_direct_sending:
 
 	up_read(&qp->state_lock);
@@ -1505,28 +1505,31 @@ int siw_req_notify_cq(struct ib_cq *ofa_cq, enum ib_cq_notify_flags flags)
  */
 int siw_dereg_mr(struct ib_mr *ofa_mr)
 {
+	printk("call in siw_dereg_mr\n");
 	struct siw_mr	*mr;
 	struct siw_dev	*sdev = siw_dev_ofa2siw(ofa_mr->device);
-
+	//printk("Point 1 in siw_dereg_mr\n");
 	mr = siw_mr_ofa2siw(ofa_mr);
-
+	//printk("Point 2 in siw_dereg_mr\n");
 	dprint(DBG_OBJ|DBG_MM, "(MEM%d): Release UMem %p, #ref's: %d\n",
 		mr->mem.hdr.id, mr->umem,
 		atomic_read(&mr->mem.hdr.ref.refcount));
 
 	mr->mem.stag_state = STAG_INVALID;
-
+	//printk("Point 3 in siw_dereg_mr\n");
 	siw_pd_put(mr->pd);
+	//printk("Point 4 in siw_dereg_mr\n");
 	siw_remove_obj(&sdev->idr_lock, &sdev->mem_idr, &mr->mem.hdr);
+	//printk("Point 5 in siw_dereg_mr\n");
 	siw_mem_put(&mr->mem);
-
+	//printk("Point 6 in siw_dereg_mr\n");
 	return 0;
 }
 
 static struct siw_mr *siw_alloc_mr(struct siw_dev *sdev, struct siw_umem *umem,
 				   u64 start, u64 len, int rights)
 {
-	struct siw_mr *mr = kzalloc(sizeof *mr, GFP_KERNEL);
+	struct siw_mr *mr = kzalloc(sizeof (*mr), GFP_KERNEL);
 	if (!mr)
 		return NULL;
 
@@ -1555,6 +1558,33 @@ static struct siw_mr *siw_alloc_mr(struct siw_dev *sdev, struct siw_umem *umem,
 	return mr;
 }
 
+
+struct ib_mr *siw_ib_alloc_mr(struct ib_pd *ofa_pd,
+	enum ib_mr_type mr_type,
+	u32 max_num_sg)
+{
+	if (mr_type != IB_MR_TYPE_MEM_REG)
+		return ERR_PTR(-EINVAL);
+	struct siw_pd		*spd = siw_pd_ofa2siw(ofa_pd);
+	if (spd == NULL)
+	{
+		printk("siw_reg_user_mr get pd==NULL!\n");
+		return NULL;
+	}
+	if (max_num_sg == 0)
+		max_num_sg = 8;
+	struct siw_umem * umem = siw_umem_get(0, max_num_sg * 4096);
+	printk("siw_umem_get get umem:%p\n", umem);
+	struct siw_dev		*sdev = spd->hdr.sdev;
+	struct siw_mr * smr = siw_alloc_mr(sdev, umem, 0, max_num_sg * 4096, IB_ACCESS_REMOTE_READ | IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE);
+	//printk("siw_ib_alloc_mr stone4, smr=%p\n", smr);
+	smr->pd = spd;
+	if(smr != NULL)
+		return &smr->ofa_mr;
+	else
+		return ERR_PTR(-EINVAL);
+}
+
 /*
  * siw_reg_user_mr()
  *
@@ -1570,22 +1600,40 @@ static struct siw_mr *siw_alloc_mr(struct siw_dev *sdev, struct siw_umem *umem,
 struct ib_mr *siw_reg_user_mr(struct ib_pd *ofa_pd, u64 start, u64 len,
 			      u64 rnic_va, int rights, struct ib_udata *udata)
 {
+	printk("siw_reg_user_mr acalled");
+	//if (ofa_pd == NULL)
+	//{
+	//	printk("siw_reg_user_mr get ofa_pd==NULL!\n");
+	//	return NULL;
+	//}
 	struct siw_mr		*mr = NULL;
 	struct siw_pd		*pd = siw_pd_ofa2siw(ofa_pd);
 	struct siw_umem		*umem = NULL;
 	struct siw_ureq_reg_mr	ureq;
 	struct siw_uresp_reg_mr	uresp;
+	if (pd == NULL)
+	{
+		printk("siw_reg_user_mr get pd==NULL!\n");
+		return NULL;
+	}
+	printk("siw_reg_user_mr stone2\n");
 	struct siw_dev		*sdev = pd->hdr.sdev;
 
 	unsigned long mem_limit = rlimit(RLIMIT_MEMLOCK);
 	int rv;
-
+	printk(" start: 0x%016llx, "
+		"va: 0x%016llx, len: %llu, ctx: %p\n",
+		(unsigned long long)start,
+		(unsigned long long)rnic_va,
+		(unsigned long long)len,
+		ofa_pd->uobject->context);
 	dprint(DBG_MM|DBG_OBJ, " start: 0x%016llx, "
 		"va: 0x%016llx, len: %llu, ctx: %p\n",
 		(unsigned long long)start,
 		(unsigned long long)rnic_va,
 		(unsigned long long)len,
 		ofa_pd->uobject->context);
+	printk("siw_reg_user_mr stone3\n");
 	if (atomic_inc_return(&sdev->num_mem) > SIW_MAX_MR) {
 		dprint(DBG_ON, ": Out of MRs: %d\n",
 			atomic_read(&sdev->num_mem));

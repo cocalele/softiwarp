@@ -111,5 +111,5 @@ extern int siw_mmap(struct ib_ucontext *, struct vm_area_struct *);
 
 extern struct dma_map_ops siw_dma_generic_ops;
 extern struct ib_dma_mapping_ops siw_dma_mapping_ops;
-
+extern struct ib_mr *siw_ib_alloc_mr(struct ib_pd *ofa_pd, enum ib_mr_type mr_type, u32 max_num_sg);
 #endif

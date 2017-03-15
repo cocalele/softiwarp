@@ -461,6 +461,7 @@ static struct siw_dev *siw_device_create(struct net_device *netdev)
 	ofa_dev->req_notify_cq = siw_req_notify_cq;
 	ofa_dev->post_send = siw_post_send;
 	ofa_dev->post_recv = siw_post_receive;
+	ofa_dev->alloc_mr = siw_ib_alloc_mr;
 
 	ofa_dev->dma_ops = &siw_dma_mapping_ops;
 
